@@ -103,7 +103,7 @@ func (c *Client) CreateGeofence(name string, coordinates [][]float64, webhookURL
 	payload := geofencePayload{
 		Name:       name,
 		WebhookURL: webhookURL,
-		GeoJSON: map[string]interface{}{
+		GeoJSON: map[string]any{
 			"type":        "Polygon",
 			"coordinates": [][][]float64{polygon},
 		},

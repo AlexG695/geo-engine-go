@@ -107,6 +107,5 @@ Consulta el archivo [LICENSE](LICENSE) para más detalles.
 2. Crea una rama (`feature/nueva-funcionalidad`)
 3. Envía un Pull Request 🚀
 
-```
 
 
