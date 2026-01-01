@@ -1,7 +1,3 @@
-
----
-
-````md
 # 📦 Geo-Engine Go SDK
 
 Cliente oficial en **Go** para interactuar con la plataforma **Geo-Engine**.  
@@ -113,5 +109,4 @@ Consulta el archivo [LICENSE](LICENSE) para más detalles.
 
 ```
 
----
 
