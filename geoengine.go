@@ -10,7 +10,7 @@ import (
 
 const (
 	defaultManagementURL = "https://api.geoengine.dev"
-	defaultIngestURL     = "http://ingest.geoengine.dev"
+	defaultIngestURL     = "https://ingest.geoengine.dev"
 	defaultTimeout       = 10 * time.Second
 	userAgent            = "GeoEngineGo/1.0.0"
 )
