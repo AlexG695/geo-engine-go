@@ -15,8 +15,8 @@ Permite:
 Usa `go get` para instalar el SDK:
 
 ```bash
-go get github.com/tu-usuario/geo-engine-go
-````
+go get github.com/AlexG695/geo-engine-go
+```
 
 ---
 
@@ -30,7 +30,7 @@ package main
 import (
     "log"
 
-    "github.com/tu-usuario/geo-engine-go"
+    "github.com/AlexG695/geo-engine-go"
 )
 
 func main() {
