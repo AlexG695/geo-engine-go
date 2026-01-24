@@ -1,18 +1,26 @@
 # 📦 Geo-Engine Go SDK
 
-Cliente oficial en **Go** para interactuar con la plataforma **Geo-Engine**.  
-Diseñado para **alto rendimiento**, simplicidad y fácil integración en servicios de backend.
+[![Go Reference](https://pkg.go.dev/badge/github.com/AlexG695/geo-engine-go.svg)](https://pkg.go.dev/github.com/AlexG695/geo-engine-go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/AlexG695/geo-engine-go)](https://goreportcard.com/report/github.com/AlexG695/geo-engine-go)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Permite:
-- 📍 Enviar ubicaciones en tiempo real
-- 🚚 Identificar dispositivos (vehículos, usuarios, activos)
-- ⚡ Integrarse fácilmente en microservicios y APIs en Go
+> *Read this in Spanish: [README.es.md](./README.es.md)*
+
+
+Official idiomatic **Go** client for the **Geo-Engine** platform.  
+Designed for **high performance**, thread safety, and easy integration into backend services.
+
+## ✨ Features
+
+- 📍 Real-time location ingestion
+- 🚧 Dynamic geofence creation and management
+- ⚡ Native `context.Context` support for timeouts and cancellation
 
 ---
 
-## 🚀 Instalación
+## 🚀 Installation
 
-Usa `go get` para instalar el SDK:
+Use `go get` to install the SDK:
 
 ```bash
 go get github.com/AlexG695/geo-engine-go
@@ -20,92 +28,74 @@ go get github.com/AlexG695/geo-engine-go
 
 ---
 
-## ⚡ Uso Rápido
+## ⚡ Quick Start
 
-Envía la ubicación de un dispositivo en pocos pasos:
+Send a device location in just a few lines:
 
 ```go
 package main
 
 import (
+    "context"
     "log"
+    "time"
 
-    "github.com/AlexG695/geo-engine-go"
+    geoengine "github.com/AlexG695/geo-engine-go"
 )
 
 func main() {
-    // 1. Inicializar cliente
-    // Por defecto conecta a la nube de producción
+    // 1. Initialize client
     client := geoengine.New("sk_live_123456")
 
-    // 2. Enviar ubicación
-    err := client.SendLocation("camion-01", 19.4326, -99.1332)
+    // 2. Create a context with timeout (Best Practice)
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    // 3. Send location
+    // ID, Latitude, Longitude
+    err := client.SendLocation(ctx, "truck-01", 19.4326, -99.1332)
     if err != nil {
-        log.Fatalf("Error enviando datos: %v", err)
+        log.Fatalf("Error sending data: %v", err)
     }
 
-    log.Println("✅ Ubicación enviada correctamente")
+    log.Println("✅ Location sent successfully")
 }
 ```
 
 ---
 
-## 🔧 Configuración Avanzada
+## 🔧 Advanced Configuration
 
-Puedes personalizar el cliente usando **opciones funcionales**, por ejemplo para conectar a un entorno local o ajustar timeouts:
+The client uses the **Functional Options** pattern for clean configuration:
 
 ```go
 client := geoengine.New(
     "sk_test_123456",
-    geoengine.WithIngestURL("http://localhost:8080"),
-    geoengine.WithTimeout(5 * time.Second),
+    geoengine.WithIngestURL("http://localhost:8080"), // For local dev
+    geoengine.WithTimeout(2 * time.Second),           // Aggressive timeout
 )
 ```
 
-### Opciones disponibles
+### Available Options
 
-| Opción                         | Descripción                          |
-| ------------------------------ | ------------------------------------ |
-| `WithIngestURL(url string)`    | Cambia el endpoint de ingestión      |
-| `WithTimeout(d time.Duration)` | Define el timeout de las solicitudes |
-
----
-
-## 🔐 Autenticación
-
-El SDK utiliza **API Keys** para autenticación.
-
-* Producción: `sk_live_...`
-* Pruebas: `sk_test_...`
-
-👉 Mantén tus claves seguras y **no las incluyas en el código fuente**.
+| Option                          | Description                       |
+| ------------------------------- | --------------------------------- |
+| `WithIngestURL(url string)`     | Overrides the ingestion endpoint  |
+| `WithManagementURL(url string)` | Overrides the management endpoint |
+| `WithTimeout(d time.Duration)`  | Sets the HTTP client timeout      |
 
 ---
 
 ## 🧪 Testing
 
-Para correr las pruebas:
+Run the tests using standard Go tools:
 
 ```bash
-go test ./...
+go test -v ./...
 ```
 
 ---
 
-## 📄 Licencia
+## 📄 License
 
-Este proyecto está bajo la licencia **MIT**.
-Consulta el archivo [LICENSE](LICENSE) para más detalles.
-
----
-
-## 🤝 Contribuciones
-
-¡Las contribuciones son bienvenidas!
-
-1. Haz un fork del proyecto
-2. Crea una rama (`feature/nueva-funcionalidad`)
-3. Envía un Pull Request 🚀
-
-
-
+MIT © Geo-Engine Team
