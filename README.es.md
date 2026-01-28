@@ -43,21 +43,17 @@ import (
 )
 
 func main() {
-    // 1. Inicializar cliente
     client := geoengine.New("sk_live_123456")
 
-    // 2. Crear un contexto con timeout (Buena práctica en Go)
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
 
-    // 3. Enviar ubicación
-    // ID, Latitud, Longitud
     err := client.SendLocation(ctx, "camion-01", 19.4326, -99.1332)
     if err != nil {
         log.Fatalf("Error enviando datos: %v", err)
     }
 
-    log.Println("✅ Ubicación enviada correctamente")
+    log.Println("Ubicación enviada correctamente")
 }
 
 ```
@@ -72,7 +68,7 @@ El cliente utiliza el patrón de **Opciones Funcionales** (Functional Options) p
 client := geoengine.New(
     "sk_test_123456",
     geoengine.WithIngestURL("http://localhost:8080"), // Para desarrollo local
-    geoengine.WithTimeout(2 * time.Second),           // Timeout agresivo
+    geoengine.WithTimeout(2 * time.Second),
 )
 
 ```
