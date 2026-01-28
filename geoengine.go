@@ -43,6 +43,15 @@ func WithManagementURL(url string) Option {
 	}
 }
 
+// WithBaseURL overrides both the management and ingestion URLs.
+// This is primarily useful for testing with a mock server.
+func WithBaseURL(url string) Option {
+	return func(c *Client) {
+		c.ingestURL = url
+		c.managementURL = url
+	}
+}
+
 // WithTimeout sets the maximum duration for HTTP requests.
 func WithTimeout(d time.Duration) Option {
 	return func(c *Client) {
