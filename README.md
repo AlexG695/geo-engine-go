@@ -3,7 +3,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/AlexG695/geo-engine-go.svg)](https://pkg.go.dev/github.com/AlexG695/geo-engine-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/AlexG695/geo-engine-go)](https://goreportcard.com/report/github.com/AlexG695/geo-engine-go)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Go Tests](https://github.com/AlexG695/geo-engine-go/.github/workflows/test.yml/badge.svg)](https://github.com/AlexG695/geo-engine-go/.github/workflows/test.yml)
+[![Go Tests](https://github.com/AlexG695/geo-engine-go/.github/workflows/main.yml/badge.svg)](https://github.com/AlexG695/geo-engine-go/.github/workflows/main.yml)
 
 > *Read this in Spanish: [README.es.md](./README.es.md)*
 
