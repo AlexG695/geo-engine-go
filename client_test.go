@@ -6,23 +6,27 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	geopb "github.com/AlexG695/geo-engine-go/proto/geopb"
 )
 
-func TestSendLocation(t *testing.T) {
+func TestSendLocation_HTTP(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/ingest" {
-			t.Errorf("Expected path /ingest, got %s", r.URL.Path)
+		if r.URL.Path != "/ingest/" {
+			t.Errorf("expected path /ingest/, got %s", r.URL.Path)
 		}
 		if r.Method != http.MethodPost {
-			t.Errorf("Expected method POST, got %s", r.Method)
+			t.Errorf("expected method POST, got %s", r.Method)
 		}
-
 		if r.Header.Get("X-API-Key") != "test-api-key" {
-			t.Errorf("Expected API Key header")
+			t.Errorf("missing or invalid X-API-Key header")
+		}
+		if r.Header.Get("X-Signature") == "" {
+			t.Errorf("missing HMAC X-Signature header")
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok"}`))
+		_, _ = w.Write([]byte(`{"status":"queued"}`))
 	}))
 	defer server.Close()
 
@@ -30,15 +34,14 @@ func TestSendLocation(t *testing.T) {
 
 	ctx := context.Background()
 	err := client.SendLocation(ctx, "device-123", 19.4326, -99.1332)
-
 	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
+		t.Fatalf("expected no error, got: %v", err)
 	}
 }
 
 func TestSendLocation_Timeout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -49,6 +52,26 @@ func TestSendLocation_Timeout(t *testing.T) {
 	err := client.SendLocation(ctx, "device-123", 0, 0)
 
 	if err == nil {
-		t.Error("Expected timeout error, got nil")
+		t.Error("expected timeout error, got nil")
 	}
+}
+
+func TestAsyncIngester(t *testing.T) {
+	client := New("test-api-key")
+	defer client.Close()
+
+	ingester := NewAsyncIngester(client, 10, 2, 100*time.Millisecond)
+
+	ok := ingester.Enqueue(&geopb.LocationPing{
+		DeviceId:  "dev-01",
+		Latitude:  19.4326,
+		Longitude: -99.1332,
+		Timestamp: time.Now().UnixMilli(),
+	})
+
+	if !ok {
+		t.Error("failed to enqueue location ping to async ingester")
+	}
+
+	ingester.Stop()
 }

@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package geoengine.v1;
+
+option go_package = "github.com/AlexG695/geo-engine-go/proto/geopb;geopb";
+
+message LocationPing {
+  string device_id = 1;
+  double latitude = 2;
+  double longitude = 3;
+  double accuracy = 4;
+  double speed = 5;
+  double heading = 6;
+  int64 timestamp = 7;
+  bool is_mocked = 8;
+}
+
+message LocationBatchRequest {
+  repeated LocationPing pings = 1;
+}
+
+message IngestResponse {
+  bool success = 1;
+  int64 processed_count = 2;
+  string error_message = 3;
+}
+
+service GeoIngestService {
+  rpc SendSingleLocation (LocationPing) returns (IngestResponse);
+  rpc SendBatchLocation (LocationBatchRequest) returns (IngestResponse);
+}
