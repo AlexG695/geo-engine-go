@@ -142,5 +142,3 @@ go test -v ./...
 ## 📄 License
 
 MIT © Geo-Engine Team
-
-```
