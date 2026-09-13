@@ -1,7 +1,7 @@
 # 📦 Geo-Engine Go SDK
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/AlexG695/geo-engine-go.svg)](https://pkg.go.dev/github.com/AlexG695/geo-engine-go)
-[![Go Report Card](https://goreportcard.com/badge/github.com/AlexG695/geo-engine-go)](https://goreportcard.com/report/github.com/AlexG695/geo-engine-go)
+[![Go Reference](https://pkg.go.dev/badge/github.com/AlexG695/geo-engine-go/v2.svg)](https://pkg.go.dev/github.com/AlexG695/geo-engine-go/v2)
+[![Go Report Card](https://goreportcard.com/badge/github.com/AlexG695/geo-engine-go/v2)](https://goreportcard.com/report/github.com/AlexG695/geo-engine-go/v2)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Tests](https://github.com/AlexG695/geo-engine-go/actions/workflows/main.yml/badge.svg)](https://github.com/AlexG695/geo-engine-go/actions/workflows/main.yml)
 
@@ -26,7 +26,7 @@ Designed for **high performance**, thread safety, and seamless integration into 
 Use `go get` to install the SDK:
 
 ```bash
-go get github.com/AlexG695/geo-engine-go
+go get github.com/AlexG695/geo-engine-go/v2
 ```
 
 ---
@@ -43,7 +43,7 @@ import (
     "log"
     "time"
 
-    geoengine "github.com/AlexG695/geo-engine-go"
+    geoengine "github.com/AlexG695/geo-engine-go/v2"
 )
 
 func main() {
@@ -104,9 +104,10 @@ package main
 import (
     "time"
 
-    geoengine "github.com/AlexG695/geo-engine-go"
-    geopb "github.com/AlexG695/geo-engine-go/proto/geopb"
+    geoengine "github.com/AlexG695/geo-engine-go/v2"
+    geopb "github.com/AlexG695/geo-engine-go/v2/proto/geopb"
 )
+
 
 func main() {
     client := geoengine.New("sk_live_123456")

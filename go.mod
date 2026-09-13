@@ -1,4 +1,4 @@
-module github.com/AlexG695/geo-engine-go
+module github.com/AlexG695/geo-engine-go/v2
 
 go 1.25.0
 

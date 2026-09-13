@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	geopb "github.com/AlexG695/geo-engine-go/proto/geopb"
+	geopb "github.com/AlexG695/geo-engine-go/v2/proto/geopb"
 )
 
 // AsyncIngester manages a thread-safe channel queue for background batch ingestion.

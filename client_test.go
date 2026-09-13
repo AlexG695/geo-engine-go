@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	geopb "github.com/AlexG695/geo-engine-go/proto/geopb"
+	geopb "github.com/AlexG695/geo-engine-go/v2/proto/geopb"
 )
 
 func TestSendLocation_TableDriven(t *testing.T) {

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package geoengine.v1;
 
-option go_package = "github.com/AlexG695/geo-engine-go/proto/geopb;geopb";
+option go_package = "github.com/AlexG695/geo-engine-go/v2/proto/geopb;geopb";
 
 message LocationPing {
   string device_id = 1;
