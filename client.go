@@ -25,9 +25,9 @@ import (
 const (
 	defaultManagementURL = "https://management.geoengine.dev"
 	defaultIngestURL     = "https://ingest.geoengine.dev"
-	defaultGRPCAddr      = "geo-ingestion-api-757071746002.us-central1.run.app:443"
+	defaultGRPCAddr      = "ingest.geoengine.dev:443"
 	defaultTimeout       = 10 * time.Second
-	userAgent            = "GeoEngineGoSDK/2.0.0"
+	userAgent            = "GeoEngineGoSDK/2.0.3"
 )
 
 // Client interacts with GeoEngine API over HTTP REST and gRPC.
