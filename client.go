@@ -8,10 +8,11 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,7 +23,7 @@ import (
 )
 
 const (
-	defaultManagementURL = "https://api.geoengine.dev"
+	defaultManagementURL = "https://management.geoengine.dev"
 	defaultIngestURL     = "https://ingest.geoengine.dev"
 	defaultGRPCAddr      = "geo-ingestion-api-757071746002.us-central1.run.app:443"
 	defaultTimeout       = 10 * time.Second
@@ -37,8 +38,7 @@ type Client struct {
 
 	grpcConn   *grpc.ClientConn
 	grpcClient geopb.GeoIngestServiceClient
-	grpcOnce   sync.Once
-	grpcErr    error
+	grpcMu     sync.Mutex
 	mu         sync.RWMutex
 	closed     bool
 }
@@ -61,53 +61,61 @@ func New(apiKey string, opts ...Option) *Client {
 		opt(&options)
 	}
 
+	httpClient := options.HTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: options.Timeout}
+	}
+
 	return &Client{
 		opts: options,
-		http: &http.Client{Timeout: options.Timeout},
+		http: httpClient,
 	}
 }
 
 // --- gRPC Transport Layer ---
 
 func (c *Client) initGRPC() error {
-	c.grpcOnce.Do(func() {
-		creds := credentials.NewTLS(&tls.Config{InsecureSkipVerify: false})
+	c.grpcMu.Lock()
+	defer c.grpcMu.Unlock()
 
-		authInterceptor := func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-			now := time.Now().UnixMilli()
-			md := metadata.New(map[string]string{
-				"x-geo-environment": c.opts.Environment,
-				"x-request-time":    strconv.FormatInt(now, 10),
-			})
+	if c.grpcConn != nil && c.grpcClient != nil {
+		return nil
+	}
 
-			if c.opts.APIKey != "" {
-				md.Set("x-api-key", c.opts.APIKey)
-				md.Set("x-signature", c.generateHMACSignature(c.opts.APIKey, now))
-			}
+	creds := credentials.NewTLS(&tls.Config{InsecureSkipVerify: false})
 
-			if c.opts.JWTToken != "" {
-				md.Set("authorization", "Bearer "+c.opts.JWTToken)
-			}
+	authInterceptor := func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		now := time.Now().UnixMilli()
+		md := metadata.New(map[string]string{
+			"x-geo-environment": c.opts.Environment,
+			"x-request-time":    strconv.FormatInt(now, 10),
+		})
 
-			ctx = metadata.NewOutgoingContext(ctx, md)
-			return invoker(ctx, method, req, reply, cc, opts...)
+		if c.opts.APIKey != "" {
+			md.Set("x-api-key", c.opts.APIKey)
+			md.Set("x-signature", c.generateHMACSignature(c.opts.APIKey, now))
 		}
 
-		conn, err := grpc.Dial(
-			c.opts.GRPCAddress,
-			grpc.WithTransportCredentials(creds),
-			grpc.WithUnaryInterceptor(authInterceptor),
-		)
-		if err != nil {
-			c.grpcErr = fmt.Errorf("geoengine: failed to connect to gRPC server: %w", err)
-			return
+		if c.opts.JWTToken != "" {
+			md.Set("authorization", "Bearer "+c.opts.JWTToken)
 		}
 
-		c.grpcConn = conn
-		c.grpcClient = geopb.NewGeoIngestServiceClient(conn)
-	})
+		ctx = metadata.NewOutgoingContext(ctx, md)
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
 
-	return c.grpcErr
+	conn, err := grpc.NewClient(
+		c.opts.GRPCAddress,
+		grpc.WithTransportCredentials(creds),
+		grpc.WithUnaryInterceptor(authInterceptor),
+	)
+	if err != nil {
+		return fmt.Errorf("geoengine: failed to connect to gRPC server: %w", err)
+	}
+
+	c.grpcConn = conn
+	c.grpcClient = geopb.NewGeoIngestServiceClient(conn)
+	return nil
 }
 
 func (c *Client) generateHMACSignature(key string, timestamp int64) string {
@@ -121,7 +129,7 @@ func (c *Client) SendSingleLocationGRPC(ctx context.Context, ping *geopb.Locatio
 	c.mu.RLock()
 	if c.closed {
 		c.mu.RUnlock()
-		return nil, errors.New("geoengine: client is closed")
+		return nil, ErrClientClosed
 	}
 	c.mu.RUnlock()
 
@@ -137,7 +145,7 @@ func (c *Client) SendBatchLocationGRPC(ctx context.Context, pings []*geopb.Locat
 	c.mu.RLock()
 	if c.closed {
 		c.mu.RUnlock()
-		return nil, errors.New("geoengine: client is closed")
+		return nil, ErrClientClosed
 	}
 	c.mu.RUnlock()
 
@@ -161,7 +169,7 @@ type locationPayload struct {
 // SendLocation sends device coordinates over HTTP REST.
 func (c *Client) SendLocation(ctx context.Context, deviceID string, lat, lng float64) error {
 	if deviceID == "" {
-		return fmt.Errorf("device_id is required")
+		return ErrDeviceIDRequired
 	}
 
 	payload := locationPayload{
@@ -171,13 +179,14 @@ func (c *Client) SendLocation(ctx context.Context, deviceID string, lat, lng flo
 		Timestamp: time.Now().Unix(),
 	}
 
-	return c.doRequest(ctx, http.MethodPost, c.opts.IngestURL+"/ingest/", payload)
+	endpoint := strings.TrimRight(c.opts.IngestURL, "/") + "/ingest"
+	return c.doRequest(ctx, http.MethodPost, endpoint, payload)
 }
 
 // CreateGeofence creates a spatial geofence polygon in PostGIS via management REST API.
 func (c *Client) CreateGeofence(ctx context.Context, name string, coordinates [][]float64, webhookURL string) error {
 	if len(coordinates) < 3 {
-		return fmt.Errorf("at least 3 coordinate pairs are required for a polygon")
+		return ErrInvalidCoordinates
 	}
 
 	var polygon [][]float64
@@ -203,7 +212,8 @@ func (c *Client) CreateGeofence(ctx context.Context, name string, coordinates []
 		},
 	}
 
-	return c.doRequest(ctx, http.MethodPost, c.opts.ManagementURL+"/geofences", payload)
+	endpoint := strings.TrimRight(c.opts.ManagementURL, "/") + "/geofences"
+	return c.doRequest(ctx, http.MethodPost, endpoint, payload)
 }
 
 func (c *Client) doRequest(ctx context.Context, method, url string, payload interface{}) error {
@@ -241,9 +251,14 @@ func (c *Client) doRequest(ctx context.Context, method, url string, payload inte
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("api error: status %d", resp.StatusCode)
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    string(bytes.TrimSpace(bodyBytes)),
+		}
 	}
 
+	_, _ = io.Copy(io.Discard, resp.Body)
 	return nil
 }
 
@@ -257,8 +272,13 @@ func (c *Client) Close() error {
 	}
 	c.closed = true
 
+	c.grpcMu.Lock()
+	defer c.grpcMu.Unlock()
 	if c.grpcConn != nil {
-		return c.grpcConn.Close()
+		err := c.grpcConn.Close()
+		c.grpcConn = nil
+		c.grpcClient = nil
+		return err
 	}
 	return nil
 }

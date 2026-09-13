@@ -15,8 +15,9 @@ Diseñado para **alto rendimiento**, seguridad en concurrencia (thread-safe) y f
 - 📍 Ingestión de ubicaciones en tiempo real con latencia sub-10ms (HTTP REST & gRPC).
 - 🚧 Creación y gestión dinámica de geocercas respaldadas por consultas espaciales en PostGIS.
 - ⚡ Soporte nativo de `context.Context` para timeouts, deadlines y cancelación.
-- 🔄 Procesador asíncrono sin bloqueos para transmisión eficiente por lotes (batching).
+- 🔄 Procesador asíncrono seguro para transmisión eficiente por lotes (batching).
 - 🛡️ Generación automática de firmas criptográficas HMAC-SHA256 para protección anti-replay.
+- 🧩 Dependencias mínimas: únicamente librería estándar y paquetes oficiales gRPC/Protobuf.
 
 ---
 
@@ -25,8 +26,7 @@ Diseñado para **alto rendimiento**, seguridad en concurrencia (thread-safe) y f
 Usa `go get` para instalar el SDK:
 
 ```bash
-go get [github.com/AlexG695/geo-engine-go](https://github.com/AlexG695/geo-engine-go)
-
+go get github.com/AlexG695/geo-engine-go
 ```
 
 ---
@@ -43,7 +43,7 @@ import (
     "log"
     "time"
 
-    geoengine "[github.com/AlexG695/geo-engine-go](https://github.com/AlexG695/geo-engine-go)"
+    geoengine "github.com/AlexG695/geo-engine-go"
 )
 
 func main() {
@@ -60,7 +60,6 @@ func main() {
 
     log.Println("Ubicación enviada correctamente")
 }
-
 ```
 
 ---
@@ -76,7 +75,6 @@ client := geoengine.New(
     geoengine.WithIngestURL("http://localhost:8080"), // Para desarrollo local
     geoengine.WithTimeout(2 * time.Second),
 )
-
 ```
 
 ### Opciones disponibles
@@ -89,7 +87,9 @@ client := geoengine.New(
 | `WithIngestURL(url string)` | Sobrescribe la URL del pipeline de ingestión REST |
 | `WithGRPCAddress(addr string)` | Sobrescribe la dirección objetivo del servidor gRPC |
 | `WithManagementURL(url string)` | Sobrescribe la URL del plano de gestión |
+| `WithBaseURL(url string)` | Sobrescribe los endpoints de ingestión y gestión (para pruebas) |
 | `WithTimeout(d time.Duration)` | Define el timeout límite del cliente HTTP |
+| `WithHTTPClient(client *http.Client)` | Configura un `*http.Client` personalizado (tracing, proxies) |
 | `WithBatchConfig(size, interval)` | Configura el tamaño y frecuencia del búfer asíncrono |
 
 ---
@@ -104,8 +104,8 @@ package main
 import (
     "time"
 
-    geoengine "[github.com/AlexG695/geo-engine-go](https://github.com/AlexG695/geo-engine-go)"
-    geopb "[github.com/AlexG695/geo-engine-go/proto/geopb](https://github.com/AlexG695/geo-engine-go/proto/geopb)"
+    geoengine "github.com/AlexG695/geo-engine-go"
+    geopb "github.com/AlexG695/geo-engine-go/proto/geopb"
 )
 
 func main() {
@@ -116,25 +116,26 @@ func main() {
     ingester := geoengine.NewAsyncIngester(client, 5000, 100, 500*time.Millisecond)
     defer ingester.Stop()
 
-    ingester.Enqueue(&geopb.LocationPing{
+    ok := ingester.Enqueue(&geopb.LocationPing{
         DeviceId:  "scooter-01",
         Latitude:  19.4326,
         Longitude: -99.1332,
         Timestamp: time.Now().UnixMilli(),
     })
+    if !ok {
+        // Manejar cola saturada o ingester cerrado
+    }
 }
-
 ```
 
 ---
 
 ## 🧪 Testing
 
-Para correr las pruebas:
+Para correr las pruebas con detección de condiciones de carrera y cobertura:
 
 ```bash
-go test -v ./...
-
+go test -v -race -cover ./...
 ```
 
 ---

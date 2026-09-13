@@ -1,5 +1,32 @@
 package geoengine
 
+import (
+	"errors"
+	"fmt"
+)
+
+var (
+	// ErrClientClosed is returned when an operation is attempted on a closed client.
+	ErrClientClosed = errors.New("geoengine: client is closed")
+
+	// ErrDeviceIDRequired is returned when a device ID is missing.
+	ErrDeviceIDRequired = errors.New("geoengine: device_id is required")
+
+	// ErrInvalidCoordinates is returned when coordinate polygon validation fails.
+	ErrInvalidCoordinates = errors.New("geoengine: at least 3 coordinate pairs are required for a polygon")
+)
+
+// APIError represents an error returned by the GeoEngine REST or Management API.
+type APIError struct {
+	StatusCode int
+	Message    string
+}
+
+// Error formats the APIError into a human-readable string.
+func (e *APIError) Error() string {
+	return fmt.Sprintf("geoengine: API error (status %d): %s", e.StatusCode, e.Message)
+}
+
 // LocationPing represents a single telemetry payload matching PostGIS location_history.
 type LocationPing struct {
 	DeviceID  string  `json:"device_id"`

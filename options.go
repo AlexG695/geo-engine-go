@@ -1,6 +1,9 @@
 package geoengine
 
-import "time"
+import (
+	"net/http"
+	"time"
+)
 
 // Options holds configuration parameters for the Client.
 type Options struct {
@@ -14,6 +17,7 @@ type Options struct {
 	BatchSize      int
 	FlushInterval  time.Duration
 	WorkerPoolSize int
+	HTTPClient     *http.Client
 }
 
 // Option modifies Options using functional parameters.
@@ -81,5 +85,12 @@ func WithBatchConfig(batchSize int, flushInterval time.Duration) Option {
 	return func(o *Options) {
 		o.BatchSize = batchSize
 		o.FlushInterval = flushInterval
+	}
+}
+
+// WithHTTPClient configures a custom *http.Client for all HTTP REST operations.
+func WithHTTPClient(client *http.Client) Option {
+	return func(o *Options) {
+		o.HTTPClient = client
 	}
 }

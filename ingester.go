@@ -3,20 +3,24 @@ package geoengine
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	geopb "github.com/AlexG695/geo-engine-go/proto/geopb"
 )
 
-// AsyncIngester manages a lock-free channel queue for background batch ingestion.
+// AsyncIngester manages a thread-safe channel queue for background batch ingestion.
 type AsyncIngester struct {
 	client    *Client
 	queue     chan *geopb.LocationPing
 	batchSize int
 	interval  time.Duration
 	wg        sync.WaitGroup
+	flushWg   sync.WaitGroup
 	ctx       context.Context
 	cancel    context.CancelFunc
+	closed    atomic.Bool
+	mu        sync.RWMutex
 }
 
 // NewAsyncIngester instantiates a background worker pool with auto-flushing.
@@ -38,7 +42,16 @@ func NewAsyncIngester(client *Client, bufferSize, batchSize int, flushInterval t
 }
 
 // Enqueue non-blockingly appends a location ping to the ingestion buffer.
+// Returns false if the ingester is closed, ping is nil, or buffer capacity is full.
 func (ai *AsyncIngester) Enqueue(ping *geopb.LocationPing) bool {
+	if ping == nil || ai.closed.Load() {
+		return false
+	}
+	ai.mu.RLock()
+	defer ai.mu.RUnlock()
+	if ai.closed.Load() {
+		return false
+	}
 	select {
 	case ai.queue <- ping:
 		return true
@@ -63,7 +76,9 @@ func (ai *AsyncIngester) worker() {
 		copy(toSend, batch)
 		batch = batch[:0]
 
+		ai.flushWg.Add(1)
 		go func(items []*geopb.LocationPing) {
+			defer ai.flushWg.Done()
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			_, _ = ai.client.SendBatchLocationGRPC(ctx, items)
@@ -72,16 +87,6 @@ func (ai *AsyncIngester) worker() {
 
 	for {
 		select {
-		case <-ai.ctx.Done():
-			for ping := range ai.queue {
-				batch = append(batch, ping)
-				if len(batch) >= ai.batchSize {
-					flush()
-				}
-			}
-			flush()
-			return
-
 		case ping, ok := <-ai.queue:
 			if !ok {
 				flush()
@@ -94,13 +99,39 @@ func (ai *AsyncIngester) worker() {
 
 		case <-ticker.C:
 			flush()
+
+		case <-ai.ctx.Done():
+			for {
+				select {
+				case ping, ok := <-ai.queue:
+					if !ok {
+						flush()
+						return
+					}
+					batch = append(batch, ping)
+					if len(batch) >= ai.batchSize {
+						flush()
+					}
+				default:
+					flush()
+					return
+				}
+			}
 		}
 	}
 }
 
 // Stop drains all remaining pending items and terminates workers.
 func (ai *AsyncIngester) Stop() {
-	ai.cancel()
+	ai.mu.Lock()
+	if ai.closed.Swap(true) {
+		ai.mu.Unlock()
+		return
+	}
 	close(ai.queue)
+	ai.mu.Unlock()
+
 	ai.wg.Wait()
+	ai.flushWg.Wait()
+	ai.cancel()
 }

@@ -15,8 +15,9 @@ Designed for **high performance**, thread safety, and seamless integration into 
 - 📍 Real-time sub-10ms location ingestion (HTTP REST & gRPC).
 - 🚧 Dynamic geofence creation and management backed by PostGIS spatial queries.
 - ⚡ Native `context.Context` support for timeouts, deadlines, and cancellation.
-- 🔄 Lock-free asynchronous worker pool for high-throughput batching.
+- 🔄 Thread-safe asynchronous worker pool for high-throughput batching.
 - 🛡️ Built-in HMAC-SHA256 signature generation for anti-replay protection.
+- 🧩 Minimal dependencies: only standard library and official gRPC/Protobuf packages.
 
 ---
 
@@ -25,8 +26,7 @@ Designed for **high performance**, thread safety, and seamless integration into 
 Use `go get` to install the SDK:
 
 ```bash
-go get [github.com/AlexG695/geo-engine-go](https://github.com/AlexG695/geo-engine-go)
-
+go get github.com/AlexG695/geo-engine-go
 ```
 
 ---
@@ -43,7 +43,7 @@ import (
     "log"
     "time"
 
-    geoengine "[github.com/AlexG695/geo-engine-go](https://github.com/AlexG695/geo-engine-go)"
+    geoengine "github.com/AlexG695/geo-engine-go"
 )
 
 func main() {
@@ -60,7 +60,6 @@ func main() {
 
     log.Println("Location sent successfully")
 }
-
 ```
 
 ---
@@ -76,7 +75,6 @@ client := geoengine.New(
     geoengine.WithIngestURL("http://localhost:8080"), // For local dev
     geoengine.WithTimeout(2 * time.Second),
 )
-
 ```
 
 ### Available Options
@@ -89,14 +87,16 @@ client := geoengine.New(
 | `WithIngestURL(url string)` | Overrides the ingestion REST endpoint |
 | `WithGRPCAddress(addr string)` | Overrides the default gRPC server target address |
 | `WithManagementURL(url string)` | Overrides the control plane management endpoint |
+| `WithBaseURL(url string)` | Overrides both ingest and management endpoints (mocking) |
 | `WithTimeout(d time.Duration)` | Sets the HTTP client timeout |
+| `WithHTTPClient(client *http.Client)` | Configures a custom `*http.Client` (tracing, proxies) |
 | `WithBatchConfig(size, interval)` | Configures buffer limits for the background async worker |
 
 ---
 
 ## 🔄 High-Throughput Async Batch Ingestion
 
-For high-volume fleet tracking or IoT telemetry, use the lock-free background worker:
+For high-volume fleet tracking or IoT telemetry, use the background worker:
 
 ```go
 package main
@@ -104,8 +104,8 @@ package main
 import (
     "time"
 
-    geoengine "[github.com/AlexG695/geo-engine-go](https://github.com/AlexG695/geo-engine-go)"
-    geopb "[github.com/AlexG695/geo-engine-go/proto/geopb](https://github.com/AlexG695/geo-engine-go/proto/geopb)"
+    geoengine "github.com/AlexG695/geo-engine-go"
+    geopb "github.com/AlexG695/geo-engine-go/proto/geopb"
 )
 
 func main() {
@@ -116,25 +116,26 @@ func main() {
     ingester := geoengine.NewAsyncIngester(client, 5000, 100, 500*time.Millisecond)
     defer ingester.Stop()
 
-    ingester.Enqueue(&geopb.LocationPing{
+    ok := ingester.Enqueue(&geopb.LocationPing{
         DeviceId:  "vehicle-scooter-09",
         Latitude:  19.4326,
         Longitude: -99.1332,
         Timestamp: time.Now().UnixMilli(),
     })
+    if !ok {
+        // Handle buffer queue full or ingester stopped
+    }
 }
-
 ```
 
 ---
 
 ## 🧪 Testing
 
-Run the unit tests using standard Go tooling:
+Run the unit tests with race detection using standard Go tooling:
 
 ```bash
-go test -v ./...
-
+go test -v -race -cover ./...
 ```
 
 ---
