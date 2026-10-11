@@ -13,6 +13,7 @@ Designed for **high performance**, thread safety, and seamless integration into 
 ## ✨ Features
 
 - 📍 Real-time sub-10ms location ingestion (HTTP REST & gRPC).
+- 🗺️ High-performance Spatial Validation module for point-in-polygon queries (single & general).
 - 🚧 Dynamic geofence creation and management backed by PostGIS spatial queries.
 - ⚡ Native `context.Context` support for timeouts, deadlines, and cancellation.
 - 🔄 Thread-safe asynchronous worker pool for high-throughput batching.
@@ -64,6 +65,57 @@ func main() {
 
 ---
 
+## 🗺️ Spatial Module & Point Validation
+
+The `client.Spatial` module connects directly to the GeoEngine API service to perform point-in-polygon evaluations with the best DX:
+
+### Single Geofence Validation
+```go
+res, err := client.Spatial.ValidatePoint(ctx, "geofence_123", 19.4326, -99.1332)
+if err != nil {
+    if errors.Is(err, geoengine.ErrGeofenceNotFound) {
+        log.Println("Geofence not found")
+        return
+    }
+    log.Fatalf("Spatial error: %v", err)
+}
+
+if res.IsInside() {
+    log.Printf("Device is inside %s (%s)!", res.GeofenceName, res.GeofenceID)
+} else {
+    log.Println("Device is outside the geofence")
+}
+```
+
+### General Geofence Validation (All Geofences)
+```go
+res, err := client.Spatial.ValidateGeneral(ctx, 19.4326, -99.1332)
+if err != nil {
+    log.Fatalf("General validation failed: %v", err)
+}
+
+if res.HasMatches() {
+    log.Printf("Matched %d geofences: %v", res.TotalMatches, res.GeofenceNames())
+    if res.ContainsGeofence("CDMX Downtown") {
+        log.Println("Device is in CDMX Downtown")
+    }
+}
+```
+
+### Fluent Query Builder
+```go
+// Fluent syntax for maximum readability
+res, err := client.Spatial.Check(19.4326, -99.1332).
+    InGeofence("geofence_123").
+    ExecuteSingle(ctx)
+
+generalRes, err := client.Spatial.Check(19.4326, -99.1332).
+    InAllGeofences().
+    ExecuteGeneral(ctx)
+```
+
+---
+
 ## 🔧 Advanced Configuration
 
 The client uses the **Functional Options** pattern for clean configuration:
@@ -72,7 +124,7 @@ The client uses the **Functional Options** pattern for clean configuration:
 client := geoengine.New(
     "sk_test_123456",
     geoengine.WithEnvironment("test"),
-    geoengine.WithIngestURL("http://localhost:8080"), // For local dev
+    geoengine.WithAPIServiceURL("https://api.geoengine.dev"),
     geoengine.WithTimeout(2 * time.Second),
 )
 ```
@@ -84,10 +136,11 @@ client := geoengine.New(
 | `WithAPIKey(key string)` | Sets the API key for execution |
 | `WithJWTToken(token string)` | Sets the Bearer JWT token for authenticated batch sessions |
 | `WithEnvironment(env string)` | Configures the execution target (`"live"` or `"test"`) |
+| `WithAPIServiceURL(url string)` | Overrides the API service URL for spatial operations |
 | `WithIngestURL(url string)` | Overrides the ingestion REST endpoint |
 | `WithGRPCAddress(addr string)` | Overrides the default gRPC server target address |
 | `WithManagementURL(url string)` | Overrides the control plane management endpoint |
-| `WithBaseURL(url string)` | Overrides both ingest and management endpoints (mocking) |
+| `WithBaseURL(url string)` | Overrides ingest, management, and API service endpoints (for testing) |
 | `WithTimeout(d time.Duration)` | Sets the HTTP client timeout |
 | `WithHTTPClient(client *http.Client)` | Configures a custom `*http.Client` (tracing, proxies) |
 | `WithBatchConfig(size, interval)` | Configures buffer limits for the background async worker |

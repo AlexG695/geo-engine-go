@@ -13,6 +13,7 @@ Diseñado para **alto rendimiento**, seguridad en concurrencia (thread-safe) y f
 ## ✨ Características
 
 - 📍 Ingestión de ubicaciones en tiempo real con latencia sub-10ms (HTTP REST & gRPC).
+- 🗺️ Módulo de Validación Espacial de alto rendimiento para consultas point-in-polygon (individual y general).
 - 🚧 Creación y gestión dinámica de geocercas respaldadas por consultas espaciales en PostGIS.
 - ⚡ Soporte nativo de `context.Context` para timeouts, deadlines y cancelación.
 - 🔄 Procesador asíncrono seguro para transmisión eficiente por lotes (batching).
@@ -64,6 +65,57 @@ func main() {
 
 ---
 
+## 🗺️ Módulo Spatial y Validación de Geocercas
+
+El submódulo `client.Spatial` se conecta con el servicio API de GeoEngine para evaluar puntos contra geocercas de forma ultra rápida y con la mejor DX:
+
+### Validación contra una Geocerca Específica
+```go
+res, err := client.Spatial.ValidatePoint(ctx, "geofence_123", 19.4326, -99.1332)
+if err != nil {
+    if errors.Is(err, geoengine.ErrGeofenceNotFound) {
+        log.Println("Geocerca no encontrada")
+        return
+    }
+    log.Fatalf("Error espacial: %v", err)
+}
+
+if res.IsInside() {
+    log.Printf("¡El dispositivo está dentro de %s (%s)!", res.GeofenceName, res.GeofenceID)
+} else {
+    log.Println("El dispositivo está fuera de la geocerca")
+}
+```
+
+### Validación General (Todas las Geocercas de la Organización)
+```go
+res, err := client.Spatial.ValidateGeneral(ctx, 19.4326, -99.1332)
+if err != nil {
+    log.Fatalf("Error en validación general: %v", err)
+}
+
+if res.HasMatches() {
+    log.Printf("Coincidió con %d geocercas: %v", res.TotalMatches, res.GeofenceNames())
+    if res.ContainsGeofence("Zona Centro") {
+        log.Println("El dispositivo está dentro de Zona Centro")
+    }
+}
+```
+
+### Constructor Fluido (Fluent Builder)
+```go
+// Sintaxis fluida para máxima legibilidad
+res, err := client.Spatial.Check(19.4326, -99.1332).
+    InGeofence("geofence_123").
+    ExecuteSingle(ctx)
+
+generalRes, err := client.Spatial.Check(19.4326, -99.1332).
+    InAllGeofences().
+    ExecuteGeneral(ctx)
+```
+
+---
+
 ## 🔧 Configuración Avanzada
 
 El cliente utiliza el patrón de **Opciones Funcionales** (Functional Options) para una configuración limpia y mantenible:
@@ -72,7 +124,7 @@ El cliente utiliza el patrón de **Opciones Funcionales** (Functional Options) p
 client := geoengine.New(
     "sk_test_123456",
     geoengine.WithEnvironment("test"),
-    geoengine.WithIngestURL("http://localhost:8080"), // Para desarrollo local
+    geoengine.WithAPIServiceURL("https://api.geoengine.dev"),
     geoengine.WithTimeout(2 * time.Second),
 )
 ```
@@ -84,10 +136,11 @@ client := geoengine.New(
 | `WithAPIKey(key string)` | Configura la clave API de ejecución |
 | `WithJWTToken(token string)` | Configura el token JWT Bearer para operaciones por lote |
 | `WithEnvironment(env string)` | Define el entorno objetivo (`"live"` o `"test"`) |
+| `WithAPIServiceURL(url string)` | Sobrescribe la URL de api-service para operaciones espaciales |
 | `WithIngestURL(url string)` | Sobrescribe la URL del pipeline de ingestión REST |
 | `WithGRPCAddress(addr string)` | Sobrescribe la dirección objetivo del servidor gRPC |
 | `WithManagementURL(url string)` | Sobrescribe la URL del plano de gestión |
-| `WithBaseURL(url string)` | Sobrescribe los endpoints de ingestión y gestión (para pruebas) |
+| `WithBaseURL(url string)` | Sobrescribe los endpoints de ingestión, gestión y api-service (para pruebas) |
 | `WithTimeout(d time.Duration)` | Define el timeout límite del cliente HTTP |
 | `WithHTTPClient(client *http.Client)` | Configura un `*http.Client` personalizado (tracing, proxies) |
 | `WithBatchConfig(size, interval)` | Configura el tamaño y frecuencia del búfer asíncrono |

@@ -12,6 +12,7 @@ type Options struct {
 	Environment    string // "live" or "test"
 	ManagementURL  string
 	IngestURL      string
+	APIServiceURL  string
 	GRPCAddress    string
 	Timeout        time.Duration
 	BatchSize      int
@@ -65,11 +66,19 @@ func WithManagementURL(url string) Option {
 	}
 }
 
-// WithBaseURL overrides both ingestion and management endpoints for local mock testing.
+// WithAPIServiceURL overrides the API service URL used for spatial validation operations.
+func WithAPIServiceURL(url string) Option {
+	return func(o *Options) {
+		o.APIServiceURL = url
+	}
+}
+
+// WithBaseURL overrides ingestion, management, and API service endpoints for local mock testing.
 func WithBaseURL(url string) Option {
 	return func(o *Options) {
 		o.IngestURL = url
 		o.ManagementURL = url
+		o.APIServiceURL = url
 	}
 }
 

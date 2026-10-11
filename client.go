@@ -25,6 +25,7 @@ import (
 const (
 	defaultManagementURL = "https://management.geoengine.dev"
 	defaultIngestURL     = "https://ingest.geoengine.dev"
+	defaultAPIServiceURL = "https://api.geoengine.dev"
 	defaultGRPCAddr      = "ingest.geoengine.dev:443"
 	defaultTimeout       = 10 * time.Second
 	userAgent            = "GeoEngineGoSDK/2.0.3"
@@ -35,6 +36,9 @@ const (
 type Client struct {
 	opts Options
 	http *http.Client
+
+	// Spatial provides spatial querying and geofence validation capabilities.
+	Spatial *SpatialService
 
 	grpcConn   *grpc.ClientConn
 	grpcClient geopb.GeoIngestServiceClient
@@ -50,6 +54,7 @@ func New(apiKey string, opts ...Option) *Client {
 		Environment:    "live",
 		ManagementURL:  defaultManagementURL,
 		IngestURL:      defaultIngestURL,
+		APIServiceURL:  defaultAPIServiceURL,
 		GRPCAddress:    defaultGRPCAddr,
 		Timeout:        defaultTimeout,
 		BatchSize:      100,
@@ -61,15 +66,21 @@ func New(apiKey string, opts ...Option) *Client {
 		opt(&options)
 	}
 
+	if options.APIServiceURL == "" {
+		options.APIServiceURL = defaultAPIServiceURL
+	}
+
 	httpClient := options.HTTPClient
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: options.Timeout}
 	}
 
-	return &Client{
+	c := &Client{
 		opts: options,
 		http: httpClient,
 	}
+	c.Spatial = newSpatialService(c)
+	return c
 }
 
 // --- gRPC Transport Layer ---
@@ -281,4 +292,26 @@ func (c *Client) Close() error {
 		return err
 	}
 	return nil
+}
+
+// --- Spatial Validation Shortcuts ---
+
+// ValidateSpatialPoint validates if coordinates fall within a geofence by ID via the Spatial service.
+func (c *Client) ValidateSpatialPoint(ctx context.Context, geofenceID string, lat, lng float64) (*SpatialValidationResult, error) {
+	return c.Spatial.ValidatePoint(ctx, geofenceID, lat, lng)
+}
+
+// ValidateSpatialLocation validates if coordinates fall within a geofence via the Spatial service.
+func (c *Client) ValidateSpatialLocation(ctx context.Context, req SpatialValidationRequest) (*SpatialValidationResult, error) {
+	return c.Spatial.ValidateLocation(ctx, req)
+}
+
+// ValidateSpatialGeneral validates coordinates against all active geofences via the Spatial service.
+func (c *Client) ValidateSpatialGeneral(ctx context.Context, lat, lng float64) (*SpatialGeneralResult, error) {
+	return c.Spatial.ValidateGeneral(ctx, lat, lng)
+}
+
+// ValidateSpatialGeneralLocation validates coordinates against all active geofences via the Spatial service.
+func (c *Client) ValidateSpatialGeneralLocation(ctx context.Context, req SpatialGeneralRequest) (*SpatialGeneralResult, error) {
+	return c.Spatial.ValidateGeneralLocation(ctx, req)
 }
