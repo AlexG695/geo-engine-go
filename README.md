@@ -14,6 +14,8 @@ Designed for **high performance**, thread safety, and seamless integration into 
 
 - 📍 Real-time sub-10ms location ingestion (HTTP REST & gRPC).
 - 🗺️ High-performance Spatial Validation module for point-in-polygon queries (single & general).
+- 👥 Users module to manage organization members, roles, and email invitations.
+- 🛡️ GeoIdentity module to create access rules (IP lists, geographic limits) and assign them to users or the whole organization.
 - 🚧 Dynamic geofence creation and management backed by PostGIS spatial queries.
 - ⚡ Native `context.Context` support for timeouts, deadlines, and cancellation.
 - 🔄 Thread-safe asynchronous worker pool for high-throughput batching.
@@ -48,7 +50,7 @@ import (
 )
 
 func main() {
-    client := geoengine.New("sk_live_123456")
+    client := geoengine.New("geo_live_123456")
     defer client.Close()
 
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -116,6 +118,71 @@ generalRes, err := client.Spatial.Check(19.4326, -99.1332).
 
 ---
 
+## 👥 Users Module
+
+The `client.Users` module manages the members of the organization that owns the API key:
+
+```go
+// List members and available roles
+users, err := client.Users.List(ctx)
+roles, err := client.Users.ListRoles(ctx)
+
+// Invite a new member (GeoEngine sends the invitation email)
+inv, err := client.Users.Invite(ctx, geoengine.InviteUserRequest{
+    Email: "ana@acme.com",
+    Role:  geoengine.RoleViewer,
+    Lang:  "en",
+})
+if errors.Is(err, geoengine.ErrInvitationPending) {
+    log.Println("There is already a pending invitation for this email")
+}
+
+// Change a member's role or revoke their access
+user, err := client.Users.UpdateRole(ctx, "user_123", geoengine.RoleDispatcher)
+err = client.Users.Remove(ctx, "user_123")
+if errors.Is(err, geoengine.ErrLastAdmin) {
+    log.Println("The organization must keep at least one admin")
+}
+```
+
+---
+
+## 🛡️ GeoIdentity Module
+
+The `client.GeoIdentity` module creates access rules and assigns them to a user or to the whole organization:
+
+```go
+area, err := geoengine.PolygonFromLatLng([][]float64{
+    {19.40, -99.20}, {19.40, -99.10}, {19.50, -99.10}, // [lat, lng]
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+rule, err := client.GeoIdentity.CreateRule(ctx, geoengine.CreateRuleRequest{
+    Name:        "CDMX only",
+    Action:      geoengine.RuleActionBlock,
+    BlackIPList: []string{"203.0.113.0/24"},
+    BlockTor:    true,
+    GeoLimit:    area,
+    AssignedSubjects: []geoengine.SubjectAssignment{
+        {SubjectType: geoengine.SubjectUser, SubjectID: "user_123"},
+    },
+})
+
+// Assign or unassign the rule
+_, err = client.GeoIdentity.AssignToUser(ctx, rule.ID, "user_456")
+_, err = client.GeoIdentity.AssignToOrganization(ctx, rule.ID)
+_, err = client.GeoIdentity.UnassignFromUser(ctx, rule.ID, "user_456")
+
+// Rules that apply to a user (direct, by role, or organization-wide)
+rules, err := client.GeoIdentity.ListUserRules(ctx, "user_123")
+```
+
+> A rule created without `AssignedSubjects` applies to the whole organization. A rule must always keep at least one subject: removing the last one returns `ErrLastSubject` (deactivate or delete the rule instead).
+
+---
+
 ## 🔧 Advanced Configuration
 
 The client uses the **Functional Options** pattern for clean configuration:
@@ -163,7 +230,7 @@ import (
 
 
 func main() {
-    client := geoengine.New("sk_live_123456")
+    client := geoengine.New("geo_live_123456")
     defer client.Close()
 
     // Buffer: 5000 pings, Batch size: 100, Flush interval: 500ms

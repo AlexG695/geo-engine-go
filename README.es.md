@@ -14,6 +14,8 @@ Diseñado para **alto rendimiento**, seguridad en concurrencia (thread-safe) y f
 
 - 📍 Ingestión de ubicaciones en tiempo real con latencia sub-10ms (HTTP REST & gRPC).
 - 🗺️ Módulo de Validación Espacial de alto rendimiento para consultas point-in-polygon (individual y general).
+- 👥 Módulo Users para gestionar miembros de la organización, roles e invitaciones por correo.
+- 🛡️ Módulo GeoIdentity para crear reglas de acceso (listas de IPs, límites geográficos) y asignarlas a usuarios o a toda la organización.
 - 🚧 Creación y gestión dinámica de geocercas respaldadas por consultas espaciales en PostGIS.
 - ⚡ Soporte nativo de `context.Context` para timeouts, deadlines y cancelación.
 - 🔄 Procesador asíncrono seguro para transmisión eficiente por lotes (batching).
@@ -48,7 +50,7 @@ import (
 )
 
 func main() {
-    client := geoengine.New("sk_live_123456")
+    client := geoengine.New("geo_live_123456")
     defer client.Close()
 
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -116,6 +118,71 @@ generalRes, err := client.Spatial.Check(19.4326, -99.1332).
 
 ---
 
+## 👥 Módulo Users
+
+El módulo `client.Users` gestiona los miembros de la organización dueña de la API key:
+
+```go
+// Listar miembros y roles disponibles
+users, err := client.Users.List(ctx)
+roles, err := client.Users.ListRoles(ctx)
+
+// Invitar a un nuevo miembro (GeoEngine envía el correo de invitación)
+inv, err := client.Users.Invite(ctx, geoengine.InviteUserRequest{
+    Email: "ana@acme.com",
+    Role:  geoengine.RoleViewer,
+    Lang:  "es",
+})
+if errors.Is(err, geoengine.ErrInvitationPending) {
+    log.Println("Ya existe una invitación pendiente para este email")
+}
+
+// Cambiar el rol de un miembro o revocar su acceso
+user, err := client.Users.UpdateRole(ctx, "user_123", geoengine.RoleDispatcher)
+err = client.Users.Remove(ctx, "user_123")
+if errors.Is(err, geoengine.ErrLastAdmin) {
+    log.Println("La organización debe conservar al menos un administrador")
+}
+```
+
+---
+
+## 🛡️ Módulo GeoIdentity
+
+El módulo `client.GeoIdentity` crea reglas de acceso y las asigna a un usuario o a toda la organización:
+
+```go
+area, err := geoengine.PolygonFromLatLng([][]float64{
+    {19.40, -99.20}, {19.40, -99.10}, {19.50, -99.10}, // [lat, lng]
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+rule, err := client.GeoIdentity.CreateRule(ctx, geoengine.CreateRuleRequest{
+    Name:        "Solo CDMX",
+    Action:      geoengine.RuleActionBlock,
+    BlackIPList: []string{"203.0.113.0/24"},
+    BlockTor:    true,
+    GeoLimit:    area,
+    AssignedSubjects: []geoengine.SubjectAssignment{
+        {SubjectType: geoengine.SubjectUser, SubjectID: "user_123"},
+    },
+})
+
+// Asignar o quitar la regla
+_, err = client.GeoIdentity.AssignToUser(ctx, rule.ID, "user_456")
+_, err = client.GeoIdentity.AssignToOrganization(ctx, rule.ID)
+_, err = client.GeoIdentity.UnassignFromUser(ctx, rule.ID, "user_456")
+
+// Reglas que aplican a un usuario (directas, por rol o de toda la organización)
+rules, err := client.GeoIdentity.ListUserRules(ctx, "user_123")
+```
+
+> Una regla creada sin `AssignedSubjects` aplica a toda la organización. Una regla siempre debe conservar al menos un sujeto: quitar el último devuelve `ErrLastSubject` (en su lugar, desactívala o elimínala).
+
+---
+
 ## 🔧 Configuración Avanzada
 
 El cliente utiliza el patrón de **Opciones Funcionales** (Functional Options) para una configuración limpia y mantenible:
@@ -163,7 +230,7 @@ import (
 
 
 func main() {
-    client := geoengine.New("sk_live_123456")
+    client := geoengine.New("geo_live_123456")
     defer client.Close()
 
     // Búfer: 5000 pings, Tamaño de lote: 100, Frecuencia de envío: 500ms

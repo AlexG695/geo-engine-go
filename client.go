@@ -28,7 +28,7 @@ const (
 	defaultAPIServiceURL = "https://api.geoengine.dev"
 	defaultGRPCAddr      = "ingest.geoengine.dev:443"
 	defaultTimeout       = 10 * time.Second
-	userAgent            = "GeoEngineGoSDK/2.0.3"
+	userAgent            = "GeoEngineGoSDK/2.1.0"
 )
 
 // Client interacts with GeoEngine API over HTTP REST and gRPC.
@@ -39,6 +39,12 @@ type Client struct {
 
 	// Spatial provides spatial querying and geofence validation capabilities.
 	Spatial *SpatialService
+
+	// Users manages organization members, roles and invitations.
+	Users *UsersService
+
+	// GeoIdentity manages GeoIdentity access rules for users and the organization.
+	GeoIdentity *GeoIdentityService
 
 	grpcConn   *grpc.ClientConn
 	grpcClient geopb.GeoIngestServiceClient
@@ -80,6 +86,8 @@ func New(apiKey string, opts ...Option) *Client {
 		http: httpClient,
 	}
 	c.Spatial = newSpatialService(c)
+	c.Users = newUsersService(c)
+	c.GeoIdentity = newGeoIdentityService(c)
 	return c
 }
 
